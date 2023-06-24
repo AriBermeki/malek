@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DVA Dynamic App</title>
+  
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import dva from 'https://cdn.jsdelivr.net/npm/dva@2.4.1/+esm'
+
+
+    // JSON-Objekt mit Konfigurationsdaten
+    const jsonConfig = {
+      components: [
+        {
+          type: 'div',
+          props: { className: 'counter' },
+          children: [
+            {
+              type: 'h1',
+              props: {},
+              children: ['Counter']
+            },
+            {
+              type: 'p',
+              props: {},
+              children: [
+                'Count: ',
+                { type: 'span', props: {}, children: ['0'] }
+              ]
+            },
+            {
+              type: 'button',
+              props: { onclick: "dispatch('counter/increment')" },
+              children: ['Increment']
+            },
+            {
+              type: 'button',
+              props: { onclick: "dispatch('counter/decrement')" },
+              children: ['Decrement']
+            }
+          ]
+        },
+        {
+          type: 'div',
+          props: { className: 'greeting' },
+          children: [
+            {
+              type: 'h1',
+              props: {},
+              children: ['Greeting']
+            },
+            {
+              type: 'p',
+              props: {},
+              children: ['Hello, World!']
+            }
+          ]
+        }
+      ],
+      effects: [
+        {
+          namespace: 'counter',
+          effects: {
+            *incrementAsync(action, { call, put }) {
+              yield call(delay, 1000);
+              yield put({ type: 'increment' });
+            }
+          }
+        },
+        {
+          namespace: 'greeting',
+          effects: {
+            *fetchGreeting(action, { call, put }) {
+              const response = yield call(fetchGreetingApi);
+              const message = yield response.text();
+              yield put({ type: 'setGreeting', payload: message });
+            }
+          }
+        }
+      ],
+      state: {
+        counter: {
+          count: 0
+        },
+        greeting: {
+          message: ''
+        }
+      }
+    };
+
+    // Funktion zum Konvertieren von JSON-Tags in JSX-Tags
+    function convertJsonToJsx(json) {
+      if (typeof json === 'string') {
+        return json;
+      }
+
+      const { type, props, children } = json;
+
+      const jsxChildren = Array.isArray(children)
+        ? children.map(child => convertJsonToJsx(child))
+        : convertJsonToJsx(children);
+
+      return React.createElement(type, props, jsxChildren);
+    }
+
+    // DVA-App erstellen
+    const app = dva();
+
+    // Komponenten dynamisch generieren
+    jsonConfig.components.forEach(component => {
+      app.router(({ history }) => {
+        const jsxElement = convertJsonToJsx(component);
+        return jsxElement;
+      });
+    });
+
+    // Effekte hinzufügen
+    jsonConfig.effects.forEach(effect => {
+      app.model({
+        namespace: effect.namespace,
+        effects: effect.effects
+      });
+    });
+
+    // Zustand setzen
+    app.model(jsonConfig.state);
+
+    // DVA-App starten
+    app.start('#app');
+
+    // Beispiel-Funktionen für Effekte
+        function delay(duration) {
+      return new Promise(resolve => {
+        setTimeout(resolve, duration);
+      });
+    }
+
+    function fetchGreetingApi() {
+      return fetch('https://api.example.com/greeting');
+    }
+
+
+  </script>
+</body>
+</html>
